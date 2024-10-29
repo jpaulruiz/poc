@@ -8,6 +8,19 @@
 	<!-- <video ref="audio-sample" controls width="250">
 		<source src="/public/test.mp4" type="video/mp4" />
 	</video> -->
+
+	<div>
+    <!-- Audio Player -->
+    <audio ref="audioPlayer" controls @timeupdate="updateTranscription">
+      <source src="/public/test.mp3" type="audio/mp3" /> <!-- Replace with your audio file path -->
+      Your browser does not support the audio element.
+    </audio>
+
+    <!-- Transcription Display -->
+    <div class="transcription">
+      <span v-if="currentSubtitle">{{ currentSubtitle }}</span>
+    </div>
+  </div>
 	<div>
 		<button @click="startRecord">Start Voice Recording</button>
 		<button @click="endRecord">End Voice Recording</button>
@@ -21,20 +34,21 @@
 <script setup>
 import { ref, useTemplateRef, onMounted } from 'vue'
 
+const transcriptionData = ref([
+	{ text: "Hello and welcome.", start: 0.0, end: 2.5 },
+	{ text: "This is a transcription example.", start: 2.5, end: 5.0 },
+	{ text: "Enjoy watching!", start: 5.0, end: 7.5 }
+]);
+
+const audioPlayer = ref(null);
+const currentSubtitle = ref('');
+
 const withUnconfirmedSentence = ref([])
 const confirmedSentence = ref([])
 const finalSentence = ref('')
 const data = ref({})
 
 const audioSample = useTemplateRef('audio-sample')
-
-const reset = () => {
-	withUnconfirmedSentence.value = []
-	confirmedSentence.value = []
-	audioChunks.value = []
-	mediaRecorder.value.stop()
-	finalSentence.value = ''
-}
 
 const extractConfirmedSentence = (sentence1, sentence2) => {
 	const words1 = sentence1.split(' ')
@@ -58,6 +72,21 @@ const extractConfirmedSentence = (sentence1, sentence2) => {
 
 const mediaRecorder = ref(null)
 const audioChunks = ref([])
+
+// Update current subtitle based on audio's current time
+const updateTranscription = () => {
+	const currentTime = audioPlayer.value.currentTime
+	
+	// Find the current subtitle based on timestamp
+	const subtitle = transcriptionData.value.find(
+		segment => currentTime >= segment.start && currentTime <= segment.end
+	)
+
+	// Update currentSubtitle only if it's different from the previous value
+	if (subtitle && currentSubtitle.value !== subtitle.text) {
+		currentSubtitle.value = subtitle.text
+	}
+}
 
 // const handleFileUpload = (event) => {
 // 	if (event.target[0].files.length < 1) {
@@ -105,39 +134,6 @@ const audioChunks = ref([])
 // 	}
 // }
 
-const transcribeAudioChunk = () => {
-	const audioBlob = new Blob(audioChunks.value, {
-		type: "audio/webm",
-	})
-	
-	if (confirmedSentence.value.length > 0) {
-		// const lastConfirmedSentence = confirmedSentence.value[confirmedSentence.value.length - 1].join(' ');
-		
-		// if (localAgreement(lastConfirmedSentence, finalSentence.value, 2)) {
-		
-		const timestamps = data.value.words 
-		const endTs = Math.floor(Math.round((timestamps[timestamps.length - 1].end) * 100) / 100)
-		const chunk = audioBlob.slice(endTs)
-		transcribeAudio(chunk)
-		// } 
-	}
-	transcribeAudio(audioBlob)
-}
-
-const localAgreement = (lastConfirmed, final) => {
-	const lastWords = lastConfirmed.split(' ');
-	const finalWords = final.split(' ');
-	
-	// Check the last 'n' words
-	const n = 2; // Change this value as needed
-	const lastNWords = lastWords.slice(-n);
-	const finalNWords = finalWords.slice(-n);
-	
-	// Check if the last 'n' words are the same
-	return JSON.stringify(lastNWords) === JSON.stringify(finalNWords);
-};
-
-
 const startRecord = async () => {
 	navigator.mediaDevices
 	.getUserMedia({ audio: true })
@@ -159,6 +155,33 @@ const endRecord = async () => {
 		console.log('stop recording')
 		mediaRecorder.value.stop()
 	}
+}
+
+const reset = () => {
+	withUnconfirmedSentence.value = []
+	confirmedSentence.value = []
+	audioChunks.value = []
+	mediaRecorder.value.stop()
+	finalSentence.value = ''
+}
+
+const transcribeAudioChunk = () => {
+	const audioBlob = new Blob(audioChunks.value, {
+		type: "audio/webm",
+	})
+	
+	if (confirmedSentence.value.length > 0) {
+		// const lastConfirmedSentence = confirmedSentence.value[confirmedSentence.value.length - 1].join(' ');
+		
+		// if (localAgreement(lastConfirmedSentence, finalSentence.value, 2)) {
+		
+		const timestamps = data.value.words 
+		const endTs = Math.floor(Math.round((timestamps[timestamps.length - 1].end) * 100) / 100)
+		const chunk = audioBlob.slice(endTs)
+		transcribeAudio(chunk)
+		// } 
+	}
+	transcribeAudio(audioBlob)
 }
 
 const transcribeAudio = async (audioBlob) => {
@@ -199,10 +222,6 @@ const transcribeAudio = async (audioBlob) => {
 		console.log("Error transcribing audio:", error)
 	}
 }
-
-onMounted(() => {
-	transcribeAudioChunk()
-})
 </script>
 
 <style scoped>
@@ -212,5 +231,19 @@ div {
 	justify-content: center;
 	gap: 6px;
 	margin-bottom: 1rem;
+}
+.transcription {
+	font-size: 1.2em;
+	color: #333;
+	margin-top: 10px;
+	background-color: rgba(0, 0, 0, 0.8);
+	color: white;
+	padding: 10px;
+	width: 100%;
+	max-width: 600px;
+}
+.highlight {
+	color: yellow;
+	font-weight: bold;
 }
 </style>
